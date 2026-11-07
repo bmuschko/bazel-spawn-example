@@ -1,7 +1,11 @@
 # Keeps log output free of ANSI codes so the process summary can be parsed.
 common --color=no
 
-# Runs every action in a Docker container instead of the host sandbox.
+# Registers the docker strategy, which is only available if Docker is usable on the host.
 build:docker --experimental_enable_docker_sandbox
+
+# Executes every action in a Docker container instead of the host sandbox.
 build:docker --spawn_strategy=docker
+
+# Sets the image for actions that do not specify a container-image execution property.
 build:docker --experimental_docker_image=ubuntu:24.04
