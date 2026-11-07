@@ -1,0 +1,25 @@
+# Records the kernel and operating system of the environment the action ran in.
+ENV_INFO_CMD = ("{ echo \"kernel: $$(uname -s)\"; " +
+                "echo \"os: $$(grep -s '^PRETTY_NAME=' /etc/os-release | cut -d '\"' -f 2 || sw_vers -productName)\"; } > $@")
+
+genrule(
+    name = "default_image",
+    outs = ["default_image.txt"],
+    cmd = ENV_INFO_CMD,
+)
+
+genrule(
+    name = "custom_image",
+    outs = ["custom_image.txt"],
+    cmd = ENV_INFO_CMD,
+    # Overrides the image for this action only when building with the docker strategy.
+    exec_properties = {"container-image": "docker://debian:bookworm-slim"},
+)
+
+filegroup(
+    name = "all",
+    srcs = [
+        ":custom_image",
+        ":default_image",
+    ],
+)

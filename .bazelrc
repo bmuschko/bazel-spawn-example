@@ -1,0 +1,7 @@
+# Keeps log output free of ANSI codes so the process summary can be parsed.
+common --color=no
+
+# Runs every action in a Docker container instead of the host sandbox.
+build:docker --experimental_enable_docker_sandbox
+build:docker --spawn_strategy=docker
+build:docker --experimental_docker_image=ubuntu:24.04

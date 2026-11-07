@@ -1,0 +1,66 @@
+name: Bazel docker spawn strategy demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  docker-spawn-strategy:
+    name: Docker spawn strategy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: bazel-contrib/setup-bazel@0.19.1
+        with:
+          bazelisk-version: 1.30.0
+          bazelisk-cache: true
+
+      - name: Check for a running Docker daemon
+        id: docker-check
+        run: |
+          if docker info > /dev/null 2>&1; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install Docker
+        if: steps.docker-check.outputs.available != 'true'
+        uses: docker/setup-docker-action@v5
+
+      - name: Print Docker version
+        run: docker version
+
+      - name: "Step 1: Build with the host sandbox"
+        run: |
+          bazelisk clean
+          bazelisk build //:all 2>&1 | tee build.log
+          ./scripts/verify-build.sh build.log 2 '*-sandbox'
+          cat bazel-bin/default_image.txt bazel-bin/custom_image.txt
+          host_os="$(grep '^PRETTY_NAME=' /etc/os-release | cut -d '"' -f 2)"
+          grep -qx "os: ${host_os}" bazel-bin/default_image.txt
+          grep -qx "os: ${host_os}" bazel-bin/custom_image.txt
+
+      - name: "Step 2: Build with the docker spawn strategy"
+        run: |
+          bazelisk clean
+          bazelisk build --config=docker //:all 2>&1 | tee build.log
+          ./scripts/verify-build.sh build.log 2 docker
+          cat bazel-bin/default_image.txt bazel-bin/custom_image.txt
+          grep -q 'os: Ubuntu 24.04' bazel-bin/default_image.txt
+          grep -q 'os: Debian GNU/Linux 12 (bookworm)' bazel-bin/custom_image.txt
+
+      - name: "Step 3: Switch back to the host sandbox without a clean"
+        run: |
+          bazelisk build //:all 2>&1 | tee build.log
+          ./scripts/verify-build.sh build.log 0 '*-sandbox'
+          grep -q 'os: Debian GNU/Linux 12 (bookworm)' bazel-bin/custom_image.txt
